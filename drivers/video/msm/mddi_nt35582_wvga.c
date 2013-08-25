@@ -20,47 +20,44 @@
 #define EXIT_SLEEP_MODE				0x1100
 #define SET_DISPLAY_OFF				0x2800
 #define SET_DISPLAY_ON				0x2900
-#define WRDISBV						0x5100
-#define WRCTRLD						0x5300
-
-#define BL_MAX 255
-
-static struct msm_panel_common_pdata *mddi_nt35582_pdata;
+#define WRDISBV					0x5100
+#define WRCTRLD					0x5300
+#define DMSTP_L					0x5305
 
 static int mddi_nt35582_panel_on(struct platform_device *pdev)
 {
-	int ret = 0;
+	mddi_queue_register_write(EXIT_SLEEP_MODE, 0, TRUE, 0);
+	msleep(120);
+	mddi_queue_register_write(SET_DISPLAY_ON, 0, TRUE, 0);
 
-	ret = mddi_queue_register_write(EXIT_SLEEP_MODE, 0, TRUE, NULL);
-	mddi_wait(120);
-	ret = mddi_queue_register_write(SET_DISPLAY_ON, 0, FALSE, NULL);
-	return ret;
+	return 0;
 }
 
 static int mddi_nt35582_panel_off(struct platform_device *pdev)
 {
-	int ret = 0;
+	mddi_queue_register_write(SET_DISPLAY_OFF, 0, TRUE, 0);
+	mddi_queue_register_write(ENTER_SLEEP_MODE, 0, TRUE, 0);
+	msleep(5);
 
-	ret = mddi_queue_register_write(SET_DISPLAY_OFF, 0, FALSE, NULL);
-	ret = mddi_queue_register_write(ENTER_SLEEP_MODE, 0, TRUE, NULL);
-	mddi_wait(5);
-	return ret;
+	return 0;
 }
 
 static void mddi_nt35582_panel_set_backlight(struct msm_fb_data_type *mfd)
 {
-	mddi_queue_register_write(WRDISBV, mfd->bl_level, FALSE, NULL);
+	mddi_queue_register_write(WRDISBV, mfd->bl_level, TRUE, 0);
 }
 
 static int __devinit nt35582_probe(struct platform_device *pdev)
 {
-	if (pdev->id == 0) {
-		mddi_nt35582_pdata = pdev->dev.platform_data;
+	if (pdev->id == 0)
 		return 0;
-	}
 
-	/* HIGH, Backlight Control */
-	mddi_queue_register_write(WRCTRLD, 0x24, FALSE, NULL);
+	/* Set the dimming steps for rising and falling DMSTP_L=0x03 */
+	mddi_queue_register_write(DMSTP_L, 0x03, TRUE, 0);
+
+	/* Turn on the brightness control block BCTRL=1
+	 * Turn on backlight control BL=1 */
+	mddi_queue_register_write(WRCTRLD, 0x24, TRUE, 0);
 
 	msm_fb_add_device(pdev);
 
@@ -115,19 +112,19 @@ static int __init mddi_nt35582_wvga_init(void)
 	pinfo->mddi.is_type1 = TRUE;
 	pinfo->wait_cycle = 0;
 	pinfo->bpp = 16;
-	pinfo->lcd.refx100 = 6000;
-	pinfo->lcd.v_back_porch = 0;
+	pinfo->lcd.refx100 = 6118;
+	pinfo->lcd.v_back_porch = 6;
 	pinfo->lcd.v_front_porch = 0;
 	pinfo->lcd.v_pulse_width = 0;
 	pinfo->lcd.rev = 1;
 	pinfo->lcd.vsync_enable = TRUE;
 	pinfo->lcd.hw_vsync_mode = TRUE;
 	pinfo->lcd.vsync_notifier_period = (1 * HZ);
-	pinfo->bl_max = BL_MAX;
+	pinfo->bl_max = 255;
 	pinfo->bl_min = 1;
 	pinfo->clk_rate = 192000000;
-	pinfo->clk_min = 190000000;
-	pinfo->clk_max = 200000000;
+	pinfo->clk_min = 192000000;
+	pinfo->clk_max = 192000000;
 	pinfo->fb_num = 2;
 
 	ret = platform_device_register(&this_device);
